@@ -66,7 +66,7 @@ typedef struct __st_DescInfo
 {
   short type;
   long bind_type;
-  long offset_size;
+  long long offset_size;
   void *value_ptr;
   unsigned long length;
   long *ind_ptr;
@@ -141,6 +141,7 @@ odbc_alloc_statement (ODBC_CONNECTION * conn, ODBC_STATEMENT ** stmt_ptr)
       goto error;
     }
 
+  s->canceled = _FALSE_;
   s->handle_type = SQL_HANDLE_STMT;
   s->stmthd = 0;
   s->conn = NULL;
@@ -148,6 +149,7 @@ odbc_alloc_statement (ODBC_CONNECTION * conn, ODBC_STATEMENT ** stmt_ptr)
   s->cursor = NULL;
   s->sql_text = NULL;
   s->is_prepared = _FALSE_;
+  s->query_plan = _FALSE_;
   memset (&s->revised_sql, 0, sizeof (s->revised_sql));
   s->result_type = NULL_RESULT;
   s->data_at_exec_state = STMT_NEED_NO_MORE_DATA;
@@ -548,6 +550,7 @@ odbc_set_stmt_attr (ODBC_STATEMENT * stmt,
 
     case SQL_ATTR_ROW_ARRAY_SIZE:
     case SQL_ROWSET_SIZE:	// for 2.x backward compatiablity
+		DEBUG_TIMESTAMP(SQL_ROWSET_SIZE);
       odbc_set_desc_field (stmt->ard, 0, SQL_DESC_ARRAY_SIZE,
 			   valueptr, sizeof (valueptr), 1);
       break;
@@ -615,6 +618,7 @@ odbc_set_stmt_attr (ODBC_STATEMENT * stmt,
 
   return ODBC_SUCCESS;
 error:
+  DEBUG_TIMESTAMP(odbc_set_stmt_attr_ERROR);
   return ODBC_ERROR;
 }
 
@@ -1860,10 +1864,10 @@ odbc_cancel (ODBC_STATEMENT * stmt)
     {
       /* CHECK : 이로 인해서 발생하는 현상은? */
       if (stmt->stmthd > 0)
-	{
-	  cci_close_req_handle (stmt->stmthd);
-	  stmt->stmthd = -1;
-	}
+        {
+          cci_cancel(stmt->conn->connhd);
+          stmt->stmthd = -1;
+        }
     }
 
   return ODBC_SUCCESS;
@@ -2790,6 +2794,11 @@ get_flag_of_cci_execute (ODBC_STATEMENT * stmt)
 {
   if (stmt == NULL)
     return 0;
+
+  if (stmt->query_plan)
+    {
+      return stmt->query_plan;
+    }
 
   if (stmt->attr_async_enable == SQL_ASYNC_ENABLE_ON)
     {

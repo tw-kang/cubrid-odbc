@@ -98,8 +98,8 @@
                         do {                                            \
                             struct timeval now;                         \
                             FILE        *fp = NULL;                     \
-                            char        *pt;                            \
-                            pt = getenv(DEBUG_FILE_KEY);                \
+                            char        *pt = NULL;						\
+							pt = getenv(DEBUG_FILE_KEY)					\
                             if ( pt != NULL ) {                         \
                                 fp = fopen(pt, "a+");                   \
                                 gettimeofday(&now, NULL);               \
@@ -111,9 +111,19 @@
 #include <sys/types.h>
 #include <sys/timeb.h>
 
-#define DEBUG_FILE_KEY          "d:\\lsj1888\\time_log.txt"
+#define DEBUG_DETAIL(value) \
+		do {\
+			struct _timeb now;                          \
+			FILE        *fp = NULL;                     \
+			fp = fopen(DEBUG_FILE_KEY, "a+");           \
+			_ftime(&now);                       \
+			fprintf(fp, "### [%d] %ld.%07ld	%s	%d\n", value, now.time, now.millitm, __FILE__, __LINE__);                           \
+			fclose(fp);                         \
+		} while (0)
+
+#define DEBUG_FILE_KEY          "d:\\temp\\time_log.txt"
 #define DEBUG_TIMESTAMP(value)
-/*
+
                 #define DEBUG_TIMESTAMP(value)                          \
                         do {                                            \
                             struct _timeb now;                          \
@@ -123,7 +133,6 @@
                             fprintf(fp,#value "	%ld.%07ld	%s	%d\n", now.time, now.millitm, __FILE__, __LINE__);                           \
                             fclose(fp);                         \
                         } while(0)
-						*/
 #endif
 #else
 #define DEBUG_TIMESTAMP(value)
@@ -254,4 +263,11 @@ PUBLIC int get_wide_char_result (char *str,
 					   int buffer_length, 
 					   int* out_length, 
 					   char* characterset);
+/*--------------------------------------------------------------*/
+
+#ifdef CUBRID_ODBC_UNICODE
+PUBLIC int check_if_even_number (SQLUSMALLINT info_type, SQLSMALLINT buffer_length);
+PUBLIC int decide_info_value_length (SQLUSMALLINT info_type, int buffer_length, int info_value_length);
+#endif
+
 #endif /* ! __CUBRID_ODBC_UTIL_HEADER */

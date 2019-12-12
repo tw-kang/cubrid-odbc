@@ -29,7 +29,8 @@
  */
 
 #include		<string.h>
-
+#include		<windows.h>
+#include		<stdio.h>
 #include		"odbc_portable.h"
 #include		"odbc_descriptor.h"
 #include		"odbc_diag_record.h"
@@ -402,7 +403,7 @@ odbc_get_desc_field (ODBC_DESC * desc,
 
 	case SQL_DESC_BIND_OFFSET_PTR:
 	  if (value_ptr != NULL)
-	    *(long **) value_ptr = desc->bind_offset_ptr;
+	    *(long long **) value_ptr = desc->bind_offset_ptr;
 
 	  if (string_length_ptr != NULL)
 	    *string_length_ptr = sizeof (desc->bind_offset_ptr);
@@ -418,7 +419,7 @@ odbc_get_desc_field (ODBC_DESC * desc,
 
 	case SQL_DESC_ROWS_PROCESSED_PTR:
 	  if (value_ptr != NULL)
-	    *(unsigned long **) value_ptr = desc->rows_processed_ptr;
+	    *(unsigned long long **) value_ptr = desc->rows_processed_ptr;
 
 	  if (string_length_ptr != NULL)
 	    *string_length_ptr = sizeof (desc->rows_processed_ptr);
@@ -484,9 +485,13 @@ odbc_get_desc_field (ODBC_DESC * desc,
 	case SQL_DESC_CONCISE_TYPE:
 	  if (value_ptr != NULL)
 	    {
-	      if(record->concise_type == SQL_BLOB || record->concise_type == SQL_CLOB)
+	      if (record->concise_type == SQL_BLOB)
 	        {
-	          *(short *) value_ptr = SQL_BINARY;
+	          *(short *) value_ptr = SQL_LONGVARBINARY;
+	        }
+	      else if (record->concise_type == SQL_CLOB)
+	        {
+	          *(short *) value_ptr = SQL_LONGVARCHAR;
 	        }
 	      else
 	        {
@@ -931,6 +936,7 @@ odbc_set_desc_field (ODBC_DESC * desc,
   if (is_driver != 1 && is_read_only_field (field_id) == _TRUE_)
     {
       odbc_set_diag (desc->diag, "HY091", 0, NULL);
+	  DEBUG_TIMESTAMP(odbc_set_desc_field_NODATA);
       goto error;
     }
 
@@ -943,6 +949,7 @@ odbc_set_desc_field (ODBC_DESC * desc,
 	  desc->alloc_type = (short) value_ptr;
 	  break;
 	case SQL_DESC_ARRAY_SIZE:
+		DEBUG_TIMESTAMP(SQL_DESC_ARRAY_SIZE);
 	  desc->array_size = (unsigned long) value_ptr;
 	  break;
 	case SQL_DESC_ARRAY_STATUS_PTR:
@@ -1225,9 +1232,10 @@ odbc_set_desc_field (ODBC_DESC * desc,
 	}
 
     }
-
+	DEBUG_TIMESTAMP(FieldSetSuccess);
   return status;
 error:
+  DEBUG_TIMESTAMP(UnknownField);
   return ODBC_ERROR;
 }
 
@@ -1367,30 +1375,37 @@ odbc_set_ird (ODBC_STATEMENT * stmt,
   if(IS_STRING_TYPE (type) || IS_BINARY_TYPE (type))
    { 
  #ifdef CUBRID_ODBC_UNICODE
-    if((_stricmp (stmt->conn->charset, "utf-8") == 0))
-       {
-	   if(type == SQL_LONGVARCHAR || precision > 4000)
-	    {
+      if((_stricmp (stmt->conn->charset, "utf-8") == 0) || (_stricmp(stmt->conn->charset, "euc-kr") == 0))
+        {
+          if(type == SQL_LONGVARCHAR || precision > 4000)
+            {
               type = SQL_WLONGVARCHAR;
               octet_length = display_size = MAX_CUBRID_CHAR_LEN;
-	    }
-	   else
-	    {
-              type = SQL_WVARCHAR;
-	    }
+            }
+          else
+            {
+              if (type == SQL_CHAR)
+                {
+                  type = SQL_WCHAR;
+                }
+              else
+                {
+                  type = SQL_WVARCHAR;
+                }
+            }
        }
      else
        {
-           if(type == SQL_LONGVARCHAR)
-           {
-              octet_length = display_size = MAX_CUBRID_CHAR_LEN;
-            }       
-       }
-#else
          if(type == SQL_LONGVARCHAR)
            {
-              octet_length = display_size = MAX_CUBRID_CHAR_LEN;
-            }
+             octet_length = display_size = MAX_CUBRID_CHAR_LEN;
+           }       
+       }
+#else
+     if(type == SQL_LONGVARCHAR)
+       {
+         octet_length = display_size = MAX_CUBRID_CHAR_LEN;
+       }
 #endif
    }
   // set ird field
